@@ -1,12 +1,12 @@
 --- Greets players on join
 -- @data Greetings
 
-local config = require 'config.join_messages' --- @dep config.join_messages
-local Commands = require 'expcore.commands' ---@dep expcore.commands
-require 'config.expcore.command_general_parse'
+local config = require("modules.exp_legacy.config.join_messages") --- @dep config.join_messages
+local Commands = require("modules.exp_legacy.expcore.commands") ---@dep expcore.commands
+require("modules.exp_legacy.config.expcore.command_general_parse")
 
 --- Stores the join message that the player have
-local PlayerData = require 'expcore.player_data' --- @dep expcore.player_data
+local PlayerData = require("modules.exp_legacy.expcore.player_data") --- @dep expcore.player_data
 local CustomMessages = PlayerData.Settings:combine('JoinMessage')
 CustomMessages:set_metadata{
     permission = 'command/join-message'
