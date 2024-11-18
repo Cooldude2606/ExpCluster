@@ -22,11 +22,11 @@ local function res_queue(force, silent)
     local res_q = force.research_queue
     local res
 
-    if script.active_mods['space-age'] then
-        res = force.technologies['mining-productivity-3']
+    if script.active_mods["space-age"] then
+        res = force.technologies["mining-productivity-3"]
 
     else
-        res = force.technologies['mining-productivity-4']
+        res = force.technologies["mining-productivity-4"]
     end
 
     if #res_q < config.queue_amount then
