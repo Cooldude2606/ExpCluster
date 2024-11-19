@@ -11,7 +11,7 @@ return {
         [20] = true,
         [50] = true,
         [100] = true,
-        [200] = true
+        [200] = true,
     },
     rocket_launch_display_rate = 500,
     disconnect_reason = {
