@@ -13,7 +13,7 @@ This module is currently not published and therefore can not be installed via `n
 1) Create a `external_plugins` directory within your clustorio instance.
 2) Clone this repository into that directory: `git clone https://github.com/explosivegaming/ExpCluster`
 3) Install the package dev dependencies: `pnpm install`
-4) Add the plugins to your clustorio instance such as: `node ./packages/controller plugin add ./external_plugins/ExpCluster/exp_groups`
+4) Add the plugins to your clustorio instance such as: `npx clusteriocontroller plugin add ./external_plugins/ExpCluster/exp_groups`
 
 ## Contributing 
 
