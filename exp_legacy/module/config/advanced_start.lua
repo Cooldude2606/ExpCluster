@@ -108,7 +108,6 @@ return {
         ['belt-immunity-equipment'] = 1,
         ['battery-equipment'] = 2,
         ['personal-roboport-equipment'] = 1
-        ['construction-robot'] = 10
         ]]
     }
 }
