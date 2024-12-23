@@ -11,14 +11,15 @@ local config = require("modules.exp_legacy.config.research") --- @dep config.res
 local table_to_json = helpers.table_to_json
 local write_file = helpers.write_file
 
-local research = {}
+local research = {
+    time = {},
+    res_queue_enable = false,
+    mod_set = "base"
+}
+
 Storage.register(research, function(tbl)
     research = tbl
 end)
-
-research.time = {}
-research.res_queue_enable = false
-research.mod_set = "base"
 
 if script.active_mods["space-age"] then
     research.mod_set = "space-age"
