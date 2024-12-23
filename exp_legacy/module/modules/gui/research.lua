@@ -43,7 +43,7 @@ do
     local res_total = 0
     local i = 1
 
-    for k, v in pairs(config[research.mod_set].milestone) do
+    for k, v in pairs(config.milestone[research.mod_set]) do
         research.time[i] = 0
         res["lookup_name"][k] = i
         res_total = res_total + v * 60
