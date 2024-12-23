@@ -14,6 +14,13 @@ return {
     },
     file_name = "log/research.log",
     milestone = {
+        ["logistic-science-pack"] = 2400,
+        ["military-science-pack"] = 2400,
+        ["chemical-science-pack"] = 2400,
+        ["utility-science-pack"] = 2400,
+        ["production-science-pack"] = 2400,
+        ["space-science-pack"] = 2400,
+        --[[
         ["automation"] = 600,
         ["logistics"] = 300,
         ["steel-processing"] = 300,
@@ -59,6 +66,8 @@ return {
         ["speed-module-3"] = 300,
         ["rocket-silo"] = 300,
         ["space-science-pack"] = 300,
+        ]]
+    },
     },
     inf_res = {
         -- Mining Productivity
