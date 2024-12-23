@@ -11,12 +11,17 @@ local config = require("modules.exp_legacy.config.research") --- @dep config.res
 local r = {}
 
 local research = {
-    res_queue_enable = false
+    res_queue_enable = false,
+    mod_set = "base"
 }
 
 Storage.register(research, function(tbl)
     research = tbl
 end)
+
+if script.active_mods["space-age"] then
+    research.mod_set = "space-age"
+end
 
 --- @param force LuaForce
 --- @param silent boolean True when no message should be printed
@@ -60,7 +65,7 @@ local function on_research_finished(event)
     if not research.res_queue_enable then return end
 
     local force = event.research.force
-    if force.rockets_launched > 0 and force.technologies[config.bonus_inventory.res[research.mod_set].name].level > 4 then
+    if force.rockets_launched > 0 and force.technologies[config.bonus_inventory.res[research.mod_set].name].level > config.bonus_inventory.res[research.mod_set].level then
         res_queue(force, event.by_script)
     end
 end
