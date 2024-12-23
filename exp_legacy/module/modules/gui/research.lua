@@ -18,6 +18,11 @@ end)
 
 research.time = {}
 research.res_queue_enable = false
+research.mod_set = "base"
+
+if script.active_mods["space-age"] then
+    research.mod_set = "space-age"
+end
 
 local research_time_format = ExpUtil.format_time_factory{ format = "clock", hours = true, minutes = true, seconds = true }
 local empty_time = research_time_format(nil)
@@ -38,7 +43,7 @@ do
     local res_total = 0
     local i = 1
 
-    for k, v in pairs(config.milestone) do
+    for k, v in pairs(config[research.mod_set].milestone) do
         research.time[i] = 0
         res["lookup_name"][k] = i
         res_total = res_total + v * 60
@@ -89,9 +94,9 @@ local function research_res_n(res_)
 end
 
 local function research_notification(event)
-    if config.inf_res[event.research.name] then
-        if event.research.name == "mining-productivity-4" then
-            if event.research.level == 5 then
+    if config.inf_res[research.mod_set][event.research.name] then
+        if event.research.name == config.bonus_inventory[research.mod_set].name then
+            if event.research.level == config.bonus_inventory[research.mod_set].level + 1 then
                 -- Add run result to log
                 research_add_log()
             end
