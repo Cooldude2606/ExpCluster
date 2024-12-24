@@ -80,9 +80,8 @@ local function apply_module(player, area, machine, planner)
     for _, entity in pairs(surface.find_entities_filtered{ area = area, name = machine, force = force }) do
         if entity.prototype.get_crafting_speed() then
             local m_current_recipe = entity.get_recipe()
-            local m_current_recipe_prototype = m_current_recipe.prototype
 
-            if m_current_recipe_prototype.maximum_productivity or (m_current_recipe_prototype.allowed_effects and m_current_recipe_prototype.allowed_effects["productivity"]) then
+            if m_current_recipe.prototype and (m_current_recipe.prototype.maximum_productivity or (m_current_recipe.prototype.allowed_effects and m_current_recipe.prototype.allowed_effects["productivity"])) then
                 surface.upgrade_area{ area = { left_top = entity.position, right_bottom = entity.position }, force = force, player = player, item = planner["n"] }
             else
                 surface.upgrade_area{ area = { left_top = entity.position, right_bottom = entity.position }, force = force, player = player, item = planner["p"] }
