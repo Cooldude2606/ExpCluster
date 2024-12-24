@@ -4,6 +4,7 @@
 ]]
 
 local Gui = require("modules/exp_legacy/expcore/gui") --- @dep expcore.gui
+local Commands = require("modules/exp_commands")
 local Storage = require("modules/exp_util/storage") --- @dep exp_util.storage
 local Roles = require("modules.exp_legacy.expcore.roles") --- @dep expcore.roles
 local Event = require("modules/exp_legacy/utils/event") --- @dep utils.event
@@ -77,17 +78,14 @@ local tool_gui_waterfill_b =
     }:style{
         width = 80
     }:on_click(function(player, _, _)
-        local inv = player.get_main_inventory()
-
-        if (inv.get_item_count("cliff-explosives")) == 0 then
-            return player.print{ "expcom-waterfill.waterfill-cliff" }
-        end
-
         if Selection.is_selecting(player, SelectionWaterfillArea) then
             Selection.stop(player)
+            return Commands.status.success{ "exp-commands_waterfill.exit" }
+        elseif player.get_item_count("cliff-explosives") == 0 then
+            return Commands.status.error{ "exp-commands_waterfill.requires-explosives" }
         else
             Selection.start(player, SelectionWaterfillArea)
-            player.print{ "tool.entered-area-selection" }
+            return Commands.status.success{ "exp-commands_waterfill.enter" }
         end
     end)
 
