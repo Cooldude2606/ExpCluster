@@ -10,13 +10,12 @@ local Event = require("modules/exp_legacy/utils/event") --- @dep utils.event
 local Selection = require("modules/exp_legacy/modules/control/selection") --- @dep modules.control.selection
 local addon_train = require("modules/exp_scenario/commands/trains")
 local addon_research = require("modules/exp_scenario/commands/research")
-local addon_home = require("modules/exp_scenario/commands/home")
 local addon_spawn = require("modules/exp_scenario/commands/teleport")
 
 local tool_container
 
-local SelectionArtyArea = "ArtyArea"
-local SelectionWaterfillArea = "WaterfillArea"
+local SelectionArtyArea = "ExpCommand_Artillery"
+local SelectionWaterfillArea = "ExpCommand_Waterfill"
 
 local research = {}
 Storage.register(research, function(tbl)
@@ -144,7 +143,7 @@ local tool_gui_research_b =
         research.res_queue_enable = not research.res_queue_enable
 
         if research.res_queue_enable then
-            addon_research.c.res_queue(player.force, true)
+            addon_research.res_queue(player.force, true)
         end
 
         game.print{ "expcom-res.res", player.name, research.res_queue_enable }
@@ -174,110 +173,6 @@ local tool_gui_spawn_b =
         width = 80
     }:on_click(function(player, _, _)
         addon_spawn.teleport(player, player)
-    end)
-
---- Home home label
--- @element tool_gui_home_home_h
-local tool_gui_home_home_h =
-    Gui.element{
-        type = "label",
-        name = "tool_home_home_h",
-        caption = { "tool.home" },
-        tooltip = { "tool.home-tooltip" },
-        style = "heading_2_label"
-    }:style{
-        width = 160
-    }
-
---- Home home button
--- @element tool_gui_home_home_b
-local tool_gui_home_home_b =
-    Gui.element{
-        type = "button",
-        name = "tool_home_home_b",
-        caption = { "tool.apply" }
-    }:style{
-        width = 80
-    }:on_click(function(player, _, _)
-        addon_home.home(player)
-    end)
-
---- Home home set label
--- @element tool_gui_home_home_set_h
-local tool_gui_home_home_set_h =
-    Gui.element{
-        type = "label",
-        name = "tool_home_home_set_h",
-        caption = { "tool.home-set" },
-        tooltip = { "tool.home-set-tooltip" },
-        style = "heading_2_label"
-    }:style{
-        width = 160
-    }
-
---- Home home set button
--- @element tool_gui_home_home_set_b
-local tool_gui_home_home_set_b =
-    Gui.element{
-        type = "button",
-        name = "tool_home_home_set_b",
-        caption = { "tool.apply" }
-    }:style{
-        width = 80
-    }:on_click(function(player, _, _)
-        addon_home.home_set(player)
-    end)
-
---- Home home get label
--- @element tool_gui_home_home_get_h
-local tool_gui_home_home_get_h =
-    Gui.element{
-        type = "label",
-        name = "tool_home_home_get_h",
-        caption = { "tool.home-get" },
-        tooltip = { "tool.home-get-tooltip" },
-        style = "heading_2_label"
-    }:style{
-        width = 160
-    }
-
---- Home home get button
--- @element tool_gui_home_home_get_b
-local tool_gui_home_home_get_b =
-    Gui.element{
-        type = "button",
-        name = "tool_home_home_get_b",
-        caption = { "tool.apply" }
-    }:style{
-        width = 80
-    }:on_click(function(player, _, _)
-        addon_home.home_get(player)
-    end)
-
---- Home return label
--- @element tool_gui_home_return_h
-local tool_gui_home_return_h =
-    Gui.element{
-        type = "label",
-        name = "tool_home_return_h",
-        caption = { "tool.return" },
-        tooltip = { "tool.return-tooltip" },
-        style = "heading_2_label"
-    }:style{
-        width = 160
-    }
-
---- Home return button
--- @element tool_gui_home_return_b
-local tool_gui_home_return_b =
-    Gui.element{
-        type = "button",
-        name = "tool_home_return_b",
-        caption = { "tool.apply" }
-    }:style{
-        width = 80
-    }:on_click(function(player, _, _)
-        addon_home.home_return(player)
     end)
 
 local function tool_perm(player)
@@ -328,27 +223,6 @@ local function tool_perm(player)
         disp[tool_gui_spawn_l.name].visible = false
         disp[tool_gui_spawn_b.name].visible = false
     end
-
-    if Roles.player_allowed(player, "command/home") then
-        disp[tool_gui_home_home_h.name].visible = true
-        disp[tool_gui_home_home_b.name].visible = true
-        disp[tool_gui_home_home_set_h.name].visible = true
-        disp[tool_gui_home_home_set_b.name].visible = true
-        disp[tool_gui_home_home_get_h.name].visible = true
-        disp[tool_gui_home_home_get_b.name].visible = true
-        disp[tool_gui_home_return_h.name].visible = true
-        disp[tool_gui_home_return_b.name].visible = true
-
-    else
-        disp[tool_gui_home_home_h.name].visible = false
-        disp[tool_gui_home_home_b.name].visible = false
-        disp[tool_gui_home_home_set_h.name].visible = false
-        disp[tool_gui_home_home_set_b.name].visible = false
-        disp[tool_gui_home_home_get_h.name].visible = false
-        disp[tool_gui_home_home_get_b.name].visible = false
-        disp[tool_gui_home_return_h.name].visible = false
-        disp[tool_gui_home_return_b.name].visible = false
-    end
 end
 
 --- A vertical flow containing all the tool
@@ -372,15 +246,6 @@ local tool_set =
 
         tool_gui_spawn_l(disp)
         tool_gui_spawn_b(disp)
-
-        tool_gui_home_home_h(disp)
-        tool_gui_home_home_b(disp)
-        tool_gui_home_home_set_h(disp)
-        tool_gui_home_home_set_b(disp)
-        tool_gui_home_home_get_h(disp)
-        tool_gui_home_home_get_b(disp)
-        tool_gui_home_return_h(disp)
-        tool_gui_home_return_b(disp)
 
         return tool_set
     end)
