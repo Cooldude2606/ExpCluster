@@ -8,6 +8,8 @@ local format_player_name = Commands.format_player_name_locale
 
 local config = require("modules.exp_legacy.config.research") --- @dep config.research
 
+local r = {}
+
 local research = {
     res_queue_enable = false
 }
@@ -18,16 +20,9 @@ end)
 
 --- @param force LuaForce
 --- @param silent boolean True when no message should be printed
-local function res_queue(force, silent)
+function r.res_queue(force, silent)
     local res_q = force.research_queue
-    local res
-
-    if script.active_mods["space-age"] then
-        res = force.technologies["mining-productivity-3"]
-
-    else
-        res = force.technologies["mining-productivity-4"]
-    end
+    local res = force.technologies[config.bonus_inventory.res[config.mod_set].name]
 
     if #res_q < config.queue_amount then
         for i = 1, config.queue_amount - #res_q do
@@ -53,7 +48,7 @@ Commands.new("set-auto-research", { "exp-commands_research.description" })
         end
 
         if research.res_queue_enable then
-            res_queue(player.force --[[@as LuaForce]], true)
+            r.res_queue(player.force --[[@as LuaForce]], true)
         end
 
         local player_name = format_player_name(player)
@@ -65,8 +60,8 @@ local function on_research_finished(event)
     if not research.res_queue_enable then return end
 
     local force = event.research.force
-    if force.rockets_launched > 0 and force.technologies["mining-productivity-4"].level > 4 then
-        res_queue(force, event.by_script)
+    if force.rockets_launched > 0 and force.technologies[config.bonus_inventory.res[config.mod_set].name].level > config.bonus_inventory.res[config.mod_set].level then
+        r.res_queue(force, event.by_script)
     end
 end
 
@@ -74,5 +69,6 @@ local e = defines.events
 return {
     events = {
         [e.on_research_finished] = on_research_finished,
-    }
+    },
+    c = r
 }
