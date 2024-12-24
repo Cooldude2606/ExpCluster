@@ -1,76 +1,36 @@
---[[-- Commands - Research
-Adds a command to enable automatic research queueing
+--[[-- Commands - Set Automatic Train
+Adds a command that set all train back to automatic
 ]]
 
-local Storage = require("modules/exp_util/storage")
 local Commands = require("modules/exp_commands")
 local format_player_name = Commands.format_player_name_locale
-
-local config = require("modules.exp_legacy.config.research") --- @dep config.research
+local format_number = require("util").format_number
 
 local module = {}
 
-local research = {
-    res_queue_enable = false
-}
+function module.manual(player, surface, force)
+    local trains = game.train_manager.get_trains{
+        has_passenger = false,
+        is_manual = true,
+        surface = surface,
+        force = force,
+    }
 
-Storage.register(research, function(tbl)
-    research = tbl
-end)
-
---- @param force LuaForce
---- @param silent boolean True when no message should be printed
-function module.res_queue(force, silent)
-    local res_q = force.research_queue
-    local res = force.technologies[config.bonus_inventory.res[config.mod_set].name]
-
-    if #res_q < config.queue_amount then
-        for i = 1, config.queue_amount - #res_q do
-            force.add_research(res)
-
-            if not silent then
-                game.print{ "exp-commands_research.queue", res.name, res.level + i }
-            end
-        end
+    for _, train in ipairs(trains) do
+        train.manual_mode = false
     end
+
+    game.print{ "exp-commands_trains.response", format_player_name(player), format_number(#trains, false) }
 end
 
---- Sets the auto research state
-Commands.new("set-auto-research", { "exp-commands_research.description" })
-    :optional("state", { "exp-commands_research.arg-state" }, Commands.types.boolean)
-    :add_aliases{ "auto-research" }
-    :register(function(player, state)
-        --- @cast state boolean?
-        if state == nil then
-            research.res_queue_enable = not research.res_queue_enable
-        else
-            research.res_queue_enable = state
-        end
-
-        if research.res_queue_enable then
-            module.res_queue(player.force --[[@as LuaForce]], true)
-        end
-
-        local player_name = format_player_name(player)
-        game.print{ "exp-commands_research.auto-research", player_name, research.res_queue_enable }
+--- Set all trains to automatic
+Commands.new("set-trains-to-automatic", { "exp-commands_trains.description" })
+    :optional("surface", { "exp-commands_trains.arg-surface" }, Commands.types.surface)
+    :optional("force", { "exp-commands_trains.arg-force" }, Commands.types.force)
+    :register(function(player, surface, force)
+        --- @cast surface LuaSurface?
+        --- @cast force LuaForce?
+        module.manual(player, surface, force)
     end)
 
---- @param event EventData.on_research_finished
-local function on_research_finished(event)
-    if not research.res_queue_enable then return end
-
-    local force = event.research.force
-    if force.rockets_launched > 0 and force.technologies[config.bonus_inventory.res[config.mod_set].name].level > config.bonus_inventory.res[config.mod_set].level then
-        module.res_queue(force, event.by_script)
-    end
-end
-
-local e = defines.events
---- @package
-module.events = {
-    [e.on_research_finished] = on_research_finished,
-}
-
-return {
-    module
-}
+return module
