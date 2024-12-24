@@ -48,7 +48,7 @@ Commands.new("set-auto-research", { "exp-commands_research.description" })
         end
 
         if research.res_queue_enable then
-            res_queue(player.force --[[@as LuaForce]], true)
+            r.res_queue(player.force --[[@as LuaForce]], true)
         end
 
         local player_name = format_player_name(player)
@@ -61,7 +61,7 @@ local function on_research_finished(event)
 
     local force = event.research.force
     if force.rockets_launched > 0 and force.technologies[config.bonus_inventory.res[config.mod_set].name].level > config.bonus_inventory.res[config.mod_set].level then
-        res_queue(force, event.by_script)
+        r.res_queue(force, event.by_script)
     end
 end
 
