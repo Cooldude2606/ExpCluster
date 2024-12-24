@@ -73,7 +73,7 @@ local function clear_module(player, area, machine, planner)
     end
 end
 
-local function apply_module(player, area, machine, modules, planner)
+local function apply_module(player, area, machine, planner)
     local force = player.force
     local surface = player.surface
 
