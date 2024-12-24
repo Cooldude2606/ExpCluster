@@ -25,8 +25,13 @@ end
 local module_container
 local machine_name = {}
 
-for k, _ in pairs(config.machine) do
-    table.insert(machine_name, k)
+for k, _ in pairs(config.machine_set) do
+    if script.active_mods[k] then
+        for k2, v in pairs(config.machine_set[k]) do
+            config.machine[k2] = v
+            table.insert(machine_name, k2)
+        end
+    end
 end
 
 local prod_module_names = {}
@@ -59,58 +64,30 @@ local elem_filter = {
     } },
 }
 
-local function clear_module(player, area, machine)
+local function clear_module(player, area, machine, planner)
     local force = player.force
     local surface = player.surface -- Allow remote view
+
     for _, entity in pairs(surface.find_entities_filtered{ area = area, name = machine, force = force }) do
-        for _, r in pairs(surface.find_entities_filtered{ position = entity.position, name = "item-request-proxy", force = force }) do
-            if r then
-                r.destroy{ raise_destroy = true }
-            end
-        end
-
-        local m_current_module = entity.get_module_inventory()
-
-        if m_current_module then
-            local m_current_module_content = m_current_module.get_contents()
-
-            if m_current_module_content then
-                for _, item in pairs(m_current_module_content) do
-                    surface.spill_item_stack{
-                        position = entity.bounding_box.left_top,
-                        stack = item --[[ @as ItemStackDefinition https://forums.factorio.com/viewtopic.php?f=233&t=122323]],
-                        enable_looted = true,
-                        force = force,
-                        allow_belts = false
-                    }
-                end
-            end
-
-            m_current_module.clear()
-        end
+        surface.upgrade_area{ area = { left_top = entity.position, right_bottom = entity.position }, force = force, player = player, item = planner }
     end
 end
 
-local function apply_module(player, area, machine, modules)
-    -- Intentionally left as player.surface to allow use in remote view
-    for _, entity in pairs(player.surface.find_entities_filtered{ area = area, name = machine, force = player.force }) do
-        local m_current_recipe
+local function apply_module(player, area, machine, planner)
+    local force = player.force
+    local surface = player.surface
 
+    for _, entity in pairs(surface.find_entities_filtered{ area = area, name = machine, force = force }) do
         if entity.prototype.get_crafting_speed() then
-            m_current_recipe = entity.get_recipe()
-        end
+            local m_current_recipe = entity.get_recipe()
 
-        if m_current_recipe then
-            if config.module_allowed[m_current_recipe.name] then
-                entity.surface.create_entity{ name = "item-request-proxy", target = entity, position = entity.position, force = entity.force, modules = modules["n"] }
-                entity.last_user = player
+            if m_current_recipe and m_current_recipe.prototype and (m_current_recipe.prototype.maximum_productivity or (m_current_recipe.prototype.allowed_effects and m_current_recipe.prototype.allowed_effects["productivity"])) then
+                surface.upgrade_area{ area = { left_top = entity.position, right_bottom = entity.position }, force = force, player = player, item = planner["n"] }
             else
-                entity.surface.create_entity{ name = "item-request-proxy", target = entity, position = entity.position, force = entity.force, modules = modules["p"] }
-                entity.last_user = player
+                surface.upgrade_area{ area = { left_top = entity.position, right_bottom = entity.position }, force = force, player = player, item = planner["p"] }
             end
         else
-            entity.surface.create_entity{ name = "item-request-proxy", target = entity, position = entity.position, force = entity.force, modules = modules["n"] }
-            entity.last_user = player
+            surface.upgrade_area{ area = { left_top = entity.position, right_bottom = entity.position }, force = force, player = player, item = planner["n"] }
         end
     end
 end
@@ -121,6 +98,18 @@ Selection.on_selection(SelectionModuleArea, function(event)
     local player = game.players[event.player_index]
     local frame = Gui.get_left_element(player, module_container)
     local scroll_table = frame.container.scroll.table
+
+    local inventory = game.create_inventory(1)
+    inventory.insert{ name = "upgrade-planner" }
+    local upgrade_planner_set_empty = inventory[1]
+
+    local l = 1
+
+    for k, v in pairs(prototypes.get_item_filtered({ { filter = "type", type = "module" }, { filter = "hidden", mode = "and", invert = true } })) do
+        upgrade_planner_set_empty.set_mapper(l, "from", { type = "item", name = k, tier = v.tier })
+        upgrade_planner_set_empty.set_mapper(l, "to", { type = "item", name = "empty-module-slot" })
+        l = l + 1
+    end
 
     for i = 1, config.default_module_row_count do
         local mma = scroll_table["module_mm_" .. i .. "_0"].elem_value
@@ -147,18 +136,42 @@ Selection.on_selection(SelectionModuleArea, function(event)
 
             for k, v in pairs(mm["p"]) do
                 if k:find("productivity") then
-                    local module_name = k:gsub("productivity", "effectivity")
+                    local module_name = k:gsub("productivity", "efficiency")
                     mm["p"][module_name] = (mm["p"][module_name] or 0) + v
                     mm["p"][k] = nil
                 end
             end
 
             if mm then
-                clear_module(player, area, mma)
-                apply_module(player, area, mma, mm)
+                clear_module(player, area, mma, upgrade_planner_set_empty)
+
+                local inventory_2 = game.create_inventory(2)
+                inventory_2.insert{ name = "upgrade-planner", count = 2 }
+                local upgrade_planner_n = inventory_2[1]
+                local upgrade_planner_p = inventory_2[2]
+
+                l = 1
+
+                for k, v in pairs(mm["n"]) do
+                    upgrade_planner_n.set_mapper(1, "to", { type = "item", name = k, count = v, tier = 1 })
+                    l = l + 1
+                end
+
+                l = 1
+
+                for k, v in pairs(mm["p"]) do
+                    upgrade_planner_p.set_mapper(1, "to", { type = "item", name = k, count = v, tier = 1 })
+                    l = l + 1
+                end
+
+                apply_module(player, area, mma, { ["n"] = upgrade_planner_n, ["p"] = upgrade_planner_p })
+
+                inventory_2.destroy()
             end
         end
     end
+
+    inventory.destroy()
 end)
 
 local function row_set(player, element)
@@ -195,7 +208,7 @@ end
 local button_apply =
     Gui.element{
         type = "button",
-        caption = "Apply",
+        caption = { "module.apply" },
         style = "button",
     }:on_click(function(player)
         if Selection.is_selecting(player, SelectionModuleArea) then
@@ -292,6 +305,9 @@ Event.add(defines.events.on_entity_settings_pasted, function(event)
         end
     end
 
+    --[[
+    TODO handle later as may need using global to reduce creation of upgrade plans
+
     if config.copy_paste_module then
         if source.name ~= destination.name then
             return
@@ -315,4 +331,5 @@ Event.add(defines.events.on_entity_settings_pasted, function(event)
             apply_module(player, destination.bounding_box, destination.name, { ["n"] = source_inventory_content, ["p"] = source_inventory_content })
         end
     end
+    ]]
 end)
