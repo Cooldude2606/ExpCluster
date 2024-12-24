@@ -209,7 +209,7 @@ end
 local button_apply =
     Gui.element{
         type = "button",
-        caption = "Apply",
+        caption = { "module.apply" },
         style = "button",
     }:on_click(function(player)
         if Selection.is_selecting(player, SelectionModuleArea) then
