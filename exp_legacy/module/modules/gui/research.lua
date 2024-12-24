@@ -13,16 +13,18 @@ local write_file = helpers.write_file
 
 local research = {
     time = {},
-    res_queue_enable = false,
-    mod_set = "base"
+    res_queue_enable = false
 }
 
 Storage.register(research, function(tbl)
     research = tbl
 end)
 
-if script.active_mods["space-age"] then
-    research.mod_set = "space-age"
+for i = 1, #config.mod_set_lookup do
+    if script.active_mods[config.mod_set_lookup[i]] then
+        config.mod_set = config.mod_set_lookup[i]
+        break
+    end
 end
 
 local research_time_format = ExpUtil.format_time_factory{ format = "clock", hours = true, minutes = true, seconds = true }
@@ -95,9 +97,9 @@ local function research_res_n(res_)
 end
 
 local function research_notification(event)
-    if config.inf_res[research.mod_set][event.research.name] then
-        if event.research.name == config.bonus_inventory.res[research.mod_set].name then
-            if event.research.level == config.bonus_inventory.res[research.mod_set].level + 1 then
+    if config.inf_res[config.mod_set][event.research.name] then
+        if event.research.name == config.bonus_inventory.res[config.mod_set].name then
+            if event.research.level == config.bonus_inventory.res[config.mod_set].level + 1 then
                 -- Add run result to log
                 research_add_log()
             end
