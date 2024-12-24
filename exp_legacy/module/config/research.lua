@@ -5,6 +5,10 @@ return {
     enabled = true,
     pollution_ageing_by_research = false,
     queue_amount = 3,
+    mod_set = "base",
+    mod_set_lookup = {
+        "space-age"
+    },
     -- this enable 20 more inventory for each mining productivity level up to 4
     bonus_inventory = {
         enabled = true,
