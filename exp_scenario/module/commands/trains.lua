@@ -8,7 +8,7 @@ local format_number = require("util").format_number
 
 local t = {}
 
-function t.manual(player)
+function t.manual(player, surface, force)
     local trains = game.train_manager.get_trains{
         has_passenger = false,
         is_manual = true,
@@ -30,7 +30,7 @@ Commands.new("set-trains-to-automatic", { "exp-commands_trains.description" })
     :register(function(player, surface, force)
         --- @cast surface LuaSurface?
         --- @cast force LuaForce?
-        t.manual(player)
+        t.manual(player, surface, force)
     end)
 
 return t
