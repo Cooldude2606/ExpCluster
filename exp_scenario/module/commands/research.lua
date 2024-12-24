@@ -8,6 +8,7 @@ local format_player_name = Commands.format_player_name_locale
 
 local config = require("modules.exp_legacy.config.research") --- @dep config.research
 
+--- @class Command.Research
 local module = {}
 
 local research = {
@@ -71,6 +72,4 @@ module.events = {
     [e.on_research_finished] = on_research_finished,
 }
 
-return {
-    module
-}
+return module
