@@ -6,9 +6,10 @@ local Commands = require("modules/exp_commands")
 local format_player_name = Commands.format_player_name_locale
 local format_number = require("util").format_number
 
-local t = {}
+--- @class Command.Trains
+local module = {}
 
-function t.manual(player, surface, force)
+function module.manual(player, surface, force)
     local trains = game.train_manager.get_trains{
         has_passenger = false,
         is_manual = true,
@@ -30,7 +31,7 @@ Commands.new("set-trains-to-automatic", { "exp-commands_trains.description" })
     :register(function(player, surface, force)
         --- @cast surface LuaSurface?
         --- @cast force LuaForce?
-        t.manual(player, surface, force)
+        module.manual(player, surface, force)
     end)
 
-return t
+return module
