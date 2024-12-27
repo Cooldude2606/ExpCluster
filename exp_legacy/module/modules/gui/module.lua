@@ -1,6 +1,7 @@
 ---- module inserter
 -- @gui Module
 
+local AABB = require("modules/exp_util/aabb")
 local Gui = require("modules.exp_legacy.expcore.gui") --- @dep expcore.gui
 local Event = require("modules/exp_legacy/utils/event") --- @dep utils.event
 local Roles = require("modules.exp_legacy.expcore.roles") --- @dep expcore.roles
@@ -8,48 +9,31 @@ local config = require("modules.exp_legacy.config.module") --- @dep config.modul
 local Selection = require("modules.exp_legacy.modules.control.selection") --- @dep modules.control.selection
 local SelectionModuleArea = "ModuleArea"
 
---- align an aabb to the grid by expanding it
-local function aabb_align_expand(aabb)
-    return {
-        left_top = {
-            x = math.floor(aabb.left_top.x),
-            y = math.floor(aabb.left_top.y),
-        },
-        right_bottom = {
-            x = math.ceil(aabb.right_bottom.x),
-            y = math.ceil(aabb.right_bottom.y),
-        },
-    }
-end
+local module_container -- Container for this GUI
 
-local module_container
-local machine_name = {}
-
-for k, _ in pairs(config.machine_set) do
-    if script.active_mods[k] then
-        for k2, v in pairs(config.machine_set[k]) do
-            config.machine[k2] = v
-            table.insert(machine_name, k2)
+local machine_names = {}
+for mod_name, machine_set in pairs(config.machine_set) do
+    if script.active_mods[mod_name] then
+        for machine_name, v in pairs(machine_set) do
+            config.machine[machine_name] = v
+            table.insert(machine_names, machine_name)
         end
     end
 end
 
 local prod_module_names = {}
-
-local function get_module_name()
-    for name, item in pairs(prototypes.item) do
-        if item.module_effects and item.module_effects.productivity and item.module_effects.productivity > 0 then
-            prod_module_names[#prod_module_names + 1] = name
-        end
+for name, item in pairs(prototypes.item) do
+    if item.module_effects and item.module_effects.productivity and item.module_effects.productivity > 0 then
+        prod_module_names[#prod_module_names + 1] = name
     end
 end
 
 local elem_filter = {
-    name = { {
+    machine_name = { {
         filter = "name",
-        name = machine_name,
+        name = machine_names,
     } },
-    normal = { {
+    no_prod = { {
         filter = "type",
         type = "module",
     }, {
@@ -58,149 +42,189 @@ local elem_filter = {
         mode = "and",
         invert = true,
     } },
-    prod = { {
+    with_prod = { {
         filter = "type",
         type = "module",
     } },
 }
 
-local function clear_module(player, area, machine, planner)
-    local force = player.force
-    local surface = player.surface -- Allow remote view
-
-    for _, entity in pairs(surface.find_entities_filtered{ area = area, name = machine, force = force }) do
-        surface.upgrade_area{ area = { left_top = entity.position, right_bottom = entity.position }, force = force, player = player, item = planner }
-    end
-end
-
-local function apply_module(player, area, machine, planner)
+--- Apply module changes to a crafting machine
+--- @param player LuaPlayer
+--- @param area BoundingBox
+--- @param machine_name string
+--- @param planner_with_prod LuaItemStack
+--- @param planner_no_prod LuaItemStack
+local function apply_module_to_crafter(player, area, machine_name, planner_with_prod, planner_no_prod)
     local force = player.force
     local surface = player.surface
+    local upgrade_area = surface.upgrade_area
 
-    for _, entity in pairs(surface.find_entities_filtered{ area = area, name = machine, force = force }) do
-        if entity.prototype.get_crafting_speed() then
-            local m_current_recipe = entity.get_recipe()
+    --- @type BoundingBox
+    local param_area = { left_top = {}, right_bottom = {} }
 
-            if m_current_recipe and m_current_recipe.prototype and (m_current_recipe.prototype.maximum_productivity or (m_current_recipe.prototype.allowed_effects and m_current_recipe.prototype.allowed_effects["productivity"])) then
-                surface.upgrade_area{ area = { left_top = entity.position, right_bottom = entity.position }, force = force, player = player, item = planner["n"] }
-            else
-                surface.upgrade_area{ area = { left_top = entity.position, right_bottom = entity.position }, force = force, player = player, item = planner["p"] }
-            end
+    --- @type LuaSurface.upgrade_area_param
+    local params = {
+        area = param_area,
+        item = planner_with_prod,
+        player = player,
+        force = force,
+    }
+
+    for _, entity in pairs(surface.find_entities_filtered{ area = area, name = machine_name, force = force }) do
+        local pos = entity.position
+        param_area.left_top = pos
+        param_area.right_bottom = pos
+
+        local m_current_recipe = entity.get_recipe()
+        local r_proto = m_current_recipe and m_current_recipe.prototype
+
+        if r_proto and (r_proto.maximum_productivity or (r_proto.allowed_effects and r_proto.allowed_effects["productivity"])) then
+            params.item = planner_with_prod
+            upgrade_area(params)
         else
-            surface.upgrade_area{ area = { left_top = entity.position, right_bottom = entity.position }, force = force, player = player, item = planner["n"] }
+            params.item = planner_no_prod
+            upgrade_area(params)
         end
     end
 end
 
 --- when an area is selected to add protection to the area
+--- @param event EventData.on_player_selected_area
 Selection.on_selection(SelectionModuleArea, function(event)
-    local area = aabb_align_expand(event.area)
+    local area = AABB.expand(event.area)
     local player = game.players[event.player_index]
-    local frame = Gui.get_left_element(player, module_container)
+    local frame = Gui.get_left_element(player, module_container) --- @type LuaGuiElement
     local scroll_table = frame.container.scroll.table
 
-    local inventory = game.create_inventory(1)
-    inventory.insert{ name = "upgrade-planner" }
-    local upgrade_planner_set_empty = inventory[1]
+    -- Create an inventory with three upgrade planners
+    local inventory = game.create_inventory(3)
+    inventory.insert{ name = "upgrade-planner", count = 3 }
+    local planner_all = inventory[1]
+    local planner_with_prod = inventory[2]
+    local planner_no_prod = inventory[3]
+    local mapper_index = 1
 
-    local l = 1
+    for row = 1, config.default_module_row_count do
+        local machine_name = scroll_table["module_mm_" .. row .. "_0"].elem_value --[[@as string]]
+        local entity_proto = prototypes.entity[machine_name]
 
-    for k, v in pairs(prototypes.get_item_filtered({ { filter = "type", type = "module" }, { filter = "hidden", mode = "and", invert = true } })) do
-        upgrade_planner_set_empty.set_mapper(l, "from", { type = "item", name = k, tier = v.tier })
-        upgrade_planner_set_empty.set_mapper(l, "to", { type = "item", name = "empty-module-slot" })
-        l = l + 1
-    end
+        if machine_name then
+            local is_prod_crafter = false
+            local module_index = 1
+            local modules = {}
+            local no_prod = {}
 
-    for i = 1, config.default_module_row_count do
-        local mma = scroll_table["module_mm_" .. i .. "_0"].elem_value
+            -- Add all the modules selected
+            for column = 1, entity_proto.module_inventory_size do
+                local module_name = scroll_table["module_mm_" .. row .. "_" .. column].elem_value --[[@as string]]
 
-        if mma then
-            local mm = {
-                ["n"] = {},
-                ["p"] = {},
-            }
-
-            for j = 1, prototypes.entity[mma].module_inventory_size, 1 do
-                local mmo = scroll_table["module_mm_" .. i .. "_" .. j].elem_value
-
-                if mmo then
-                    if mm["n"][mmo] then
-                        mm["n"][mmo] = mm["n"][mmo] + 1
-                        mm["p"][mmo] = mm["p"][mmo] + 1
-                    else
-                        mm["n"][mmo] = 1
-                        mm["p"][mmo] = 1
+                if module_name then
+                    local not_prod = module_name:gsub("productivity", "efficiency")
+                    modules[module_index] = { name = module_name }
+                    no_prod[module_index] = { name = not_prod }
+                    module_index = module_index + 1
+                    if not is_prod_crafter and module_name ~= not_prod and entity_proto.get_crafting_speed() then
+                        is_prod_crafter = true
                     end
+                else
+                    modules[module_index] = {}
+                    no_prod[module_index] = {}
+                    module_index = module_index + 1
                 end
             end
 
-            for k, v in pairs(mm["p"]) do
-                if k:find("productivity") then
-                    local module_name = k:gsub("productivity", "efficiency")
-                    mm["p"][module_name] = (mm["p"][module_name] or 0) + v
-                    mm["p"][k] = nil
-                end
-            end
-
-            if mm then
-                clear_module(player, area, mma, upgrade_planner_set_empty)
-
-                local inventory_2 = game.create_inventory(2)
-                inventory_2.insert{ name = "upgrade-planner", count = 2 }
-                local upgrade_planner_n = inventory_2[1]
-                local upgrade_planner_p = inventory_2[2]
-
-                l = 1
-
-                for k, v in pairs(mm["n"]) do
-                    upgrade_planner_n.set_mapper(1, "to", { type = "item", name = k, count = v, tier = 1 })
-                    l = l + 1
-                end
-
-                l = 1
-
-                for k, v in pairs(mm["p"]) do
-                    upgrade_planner_p.set_mapper(1, "to", { type = "item", name = k, count = v, tier = 1 })
-                    l = l + 1
-                end
-
-                apply_module(player, area, mma, { ["n"] = upgrade_planner_n, ["p"] = upgrade_planner_p })
-
-                inventory_2.destroy()
+            if is_prod_crafter then
+                -- Crafting machines with prod need to be handled on a case by case biases
+                planner_with_prod.set_mapper(1, "from", {
+                    type = "entity",
+                    name = machine_name,
+                })
+                planner_no_prod.set_mapper(1, "from", {
+                    type = "entity",
+                    name = machine_name,
+                })
+                planner_with_prod.set_mapper(1, "to", {
+                    type = "entity",
+                    name = machine_name,
+                    module_slots = modules,
+                })
+                planner_no_prod.set_mapper(1, "to", {
+                    type = "entity",
+                    name = machine_name,
+                    module_slots = no_prod,
+                })
+                apply_module_to_crafter(player, area, machine_name, planner_with_prod, planner_no_prod)
+            else
+                -- All other machines can be applied in a single upgrade planner
+                planner_all.set_mapper(mapper_index, "from", {
+                    type = "entity",
+                    name = machine_name,
+                })
+                planner_all.set_mapper(mapper_index, "to", {
+                    type = "entity",
+                    name = machine_name,
+                    module_slots = modules,
+                })
+                mapper_index = mapper_index + 1
             end
         end
+    end
+
+    -- Apply module changes for non crafting (or without prod selected)
+    if mapper_index > 1 then
+        player.surface.upgrade_area{
+            area = area,
+            item = planner_all,
+            force = player.force,
+            player = player,
+        }
     end
 
     inventory.destroy()
 end)
 
-local function row_set(player, element)
-    local frame = Gui.get_left_element(player, module_container)
+--- Set the state of all elem selectors on a row
+--- @param player LuaPlayer
+--- @param element_name string
+local function row_set(player, element_name)
+    local frame = Gui.get_left_element(player, module_container) --[[ @as LuaGuiElement ]]
     local scroll_table = frame.container.scroll.table
+    local machine_name = scroll_table[element_name .. "0"].elem_value --[[ @as string ]]
 
-    if scroll_table[element .. "0"].elem_value then
+    if machine_name then
+        local active_to = prototypes.entity[machine_name].module_inventory_size
+        local row_count = math.ceil(active_to / config.module_slots_per_row)
+        local visible_to = row_count * config.module_slots_per_row
         for i = 1, config.module_slot_max do
-            if i <= prototypes.entity[scroll_table[element .. "0"].elem_value].module_inventory_size then
-                if config.machine[scroll_table[element .. "0"].elem_value].prod then
-                    scroll_table[element .. i].elem_filters = elem_filter.prod
+            local element = scroll_table[element_name .. i]
+            if i <= active_to then
+                if config.machine[machine_name].prod then
+                    element.elem_filters = elem_filter.with_prod
                 else
-                    scroll_table[element .. i].elem_filters = elem_filter.normal
+                    element.elem_filters = elem_filter.no_prod
                 end
 
-                scroll_table[element .. i].enabled = true
-                scroll_table[element .. i].elem_value = config.machine[scroll_table[element .. "0"].elem_value].module
+                element.visible = true
+                element.enabled = true
+                element.elem_value = config.machine[machine_name].module
             else
-                scroll_table[element .. i].enabled = false
-                scroll_table[element .. i].elem_value = nil
+                element.visible = i <= visible_to
+                element.enabled = false
+                element.elem_value = nil
+            end
+            if i % (config.module_slots_per_row + 1) == 0 then
+                scroll_table[element_name .. "pad" .. i].visible = element.visible
             end
         end
     else
-        local mf = elem_filter.normal
-
         for i = 1, config.module_slot_max do
-            scroll_table[element .. i].enabled = false
-            scroll_table[element .. i].elem_filters = mf
-            scroll_table[element .. i].elem_value = nil
+            local element = scroll_table[element_name .. i]
+            element.visible = i <= config.module_slots_per_row
+            element.enabled = false
+            element.elem_value = nil
+            if i % (config.module_slots_per_row + 1) == 0 then
+                scroll_table[element_name .. "pad" .. i].visible = false
+            end
         end
     end
 end
@@ -220,28 +244,37 @@ local button_apply =
 
 module_container =
     Gui.element(function(definition, parent)
-        local container = Gui.container(parent, definition.name, (config.module_slot_max + 2) * 36)
+        local container = Gui.container(parent, definition.name, (config.module_slots_per_row + 2) * 36)
         Gui.header(container, "Module Inserter", "", true)
 
-        local scroll_table = Gui.scroll_table(container, (config.module_slot_max + 2) * 36, config.module_slot_max + 1)
+        local slots_per_row = config.module_slots_per_row + 1
+        local scroll_table = Gui.scroll_table(container, (config.module_slots_per_row + 2) * 36, slots_per_row)
 
         for i = 1, config.default_module_row_count do
             scroll_table.add{
                 name = "module_mm_" .. i .. "_0",
                 type = "choose-elem-button",
                 elem_type = "entity",
-                elem_filters = elem_filter.name,
+                elem_filters = elem_filter.machine_name,
                 style = "slot_button",
             }
 
             for j = 1, config.module_slot_max do
+                if j % slots_per_row == 0 then
+                    scroll_table.add{
+                        type = "flow",
+                        name = "module_mm_" .. i .. "_pad" .. j,
+                        visible = false,
+                    }
+                end
                 scroll_table.add{
                     name = "module_mm_" .. i .. "_" .. j,
                     type = "choose-elem-button",
                     elem_type = "item",
-                    elem_filters = elem_filter.normal,
+                    elem_filters = elem_filter.no_prod,
                     style = "slot_button",
                     enabled = false,
+                    visible = j <= config.module_slots_per_row,
                 }
             end
         end
@@ -257,6 +290,7 @@ Gui.left_toolbar_button("item/productivity-module-3", { "module.main-tooltip" },
     return Roles.player_allowed(player, "gui/module")
 end)
 
+--- @param event EventData.on_gui_elem_changed
 Event.add(defines.events.on_gui_elem_changed, function(event)
     if event.element.name:sub(1, 10) == "module_mm_" then
         if event.element.name:sub(-1) == "0" then
@@ -265,8 +299,7 @@ Event.add(defines.events.on_gui_elem_changed, function(event)
     end
 end)
 
-Event.add(defines.events.on_player_joined_game, get_module_name)
-
+--- @param event EventData.on_entity_settings_pasted
 Event.add(defines.events.on_entity_settings_pasted, function(event)
     local source = event.source
     local destination = event.destination

@@ -1,6 +1,7 @@
 return {
     -- type of machine to handle together
     default_module_row_count = 9,
+    module_slots_per_row = 4,
     module_slot_max = 8,
     copy_paste_module = false,
     copy_paste_rotation = false,
