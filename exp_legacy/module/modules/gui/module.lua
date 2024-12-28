@@ -116,12 +116,12 @@ Selection.on_selection(SelectionModuleArea, function(event)
 
             -- Add all the modules selected
             for column = 1, entity_proto.module_inventory_size do
-                local module_name = scroll_table["module_mm_" .. row .. "_" .. column].elem_value --[[@as string]]
+                local module_name = scroll_table["module_mm_" .. row .. "_" .. column].elem_value --[[ @as {name:string, quality:string} ]]
 
                 if module_name then
-                    local not_prod = module_name:gsub("productivity", "efficiency")
-                    modules[module_index] = { name = module_name }
-                    no_prod[module_index] = { name = not_prod }
+                    local not_prod = module_name.name:gsub("productivity", "efficiency")
+                    modules[module_index] = module_name
+                    no_prod[module_index] = { name = not_prod, quality = module_name.quality }
                     module_index = module_index + 1
                     if not is_prod_crafter and module_name ~= not_prod and entity_proto.get_crafting_speed() then
                         is_prod_crafter = true
@@ -135,37 +135,55 @@ Selection.on_selection(SelectionModuleArea, function(event)
 
             if is_prod_crafter then
                 -- Crafting machines with prod need to be handled on a case by case biases
-                planner_with_prod.set_mapper(1, "from", {
-                    type = "entity",
-                    name = machine_name,
-                })
-                planner_no_prod.set_mapper(1, "from", {
-                    type = "entity",
-                    name = machine_name,
-                })
-                planner_with_prod.set_mapper(1, "to", {
-                    type = "entity",
-                    name = machine_name,
-                    module_slots = modules,
-                })
-                planner_no_prod.set_mapper(1, "to", {
-                    type = "entity",
-                    name = machine_name,
-                    module_slots = no_prod,
-                })
+                local i = 0
+                for quality_name in pairs(prototypes.quality) do
+                    i = i + 1
+                    planner_with_prod.set_mapper(i, "from", {
+                        type = "entity",
+                        name = machine_name,
+                        quality = quality_name,
+                        comparator = "=",
+                    })
+                    planner_no_prod.set_mapper(i, "from", {
+                        type = "entity",
+                        name = machine_name,
+                        quality = quality_name,
+                        comparator = "=",
+                    })
+                    planner_with_prod.set_mapper(i, "to", {
+                        type = "entity",
+                        name = machine_name,
+                        module_slots = modules,
+                        quality = quality_name,
+                        comparator = "=",
+                    })
+                    planner_no_prod.set_mapper(i, "to", {
+                        type = "entity",
+                        name = machine_name,
+                        module_slots = no_prod,
+                        quality = quality_name,
+                        comparator = "=",
+                    })
+                end
                 apply_module_to_crafter(player, area, machine_name, planner_with_prod, planner_no_prod)
             else
                 -- All other machines can be applied in a single upgrade planner
-                planner_all.set_mapper(mapper_index, "from", {
-                    type = "entity",
-                    name = machine_name,
-                })
-                planner_all.set_mapper(mapper_index, "to", {
-                    type = "entity",
-                    name = machine_name,
-                    module_slots = modules,
-                })
-                mapper_index = mapper_index + 1
+                for quality_name in pairs(prototypes.quality) do
+                    planner_all.set_mapper(mapper_index, "from", {
+                        type = "entity",
+                        name = machine_name,
+                        quality = quality_name,
+                        comparator = "=",
+                    })
+                    planner_all.set_mapper(mapper_index, "to", {
+                        type = "entity",
+                        name = machine_name,
+                        module_slots = modules,
+                        quality = quality_name,
+                        comparator = "=",
+                    })
+                    mapper_index = mapper_index + 1
+                end
             end
         end
     end
@@ -206,7 +224,7 @@ local function row_set(player, element_name)
 
                 element.visible = true
                 element.enabled = true
-                element.elem_value = config.machine[machine_name].module
+                element.elem_value = { name = config.machine[machine_name].module }
             else
                 element.visible = i <= visible_to
                 element.enabled = false
@@ -270,7 +288,7 @@ module_container =
                 scroll_table.add{
                     name = "module_mm_" .. i .. "_" .. j,
                     type = "choose-elem-button",
-                    elem_type = "item",
+                    elem_type = "item-with-quality",
                     elem_filters = elem_filter.no_prod,
                     style = "slot_button",
                     enabled = false,
