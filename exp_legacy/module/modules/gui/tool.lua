@@ -193,7 +193,6 @@ local function tool_perm(player)
     disp[tool_gui_waterfill_l.name].visible = allowed
     disp[tool_gui_waterfill_b.name].visible = allowed
 
-
     allowed = Roles.player_allowed(player, "command/set-trains-to-automatic")
     disp[tool_gui_train_l.name].visible = allowed
     disp[tool_gui_train_b.name].visible = allowed
