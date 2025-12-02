@@ -77,6 +77,8 @@ require("modules/exp_scenario/gui/research_milestones")
 require("modules/exp_scenario/gui/science_production")
 require("modules/exp_scenario/gui/surveillance")
 
-log("ExpScenario loaded " .. #module_loader.modules .. " modules")
+log("[ExpScenario] Loading modules...")
+module_loader:load_modules()
+module_loader:output_counts(function(msg) log("[ExpScenario] Loaded " .. msg) end)
 
 return module_loader
